@@ -4,6 +4,7 @@ import jakarta.persistence.Entity;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
+import jakarta.persistence.Column;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
@@ -19,6 +20,9 @@ public class Cliente {
     private Long id;
 
     private String nombre;
+    @Column(unique = true)
     private String correo;
+
+    @Column(unique = true)
     private String telefono;
 }

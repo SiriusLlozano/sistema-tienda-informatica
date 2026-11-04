@@ -6,4 +6,8 @@ import org.springframework.data.jpa.repository.JpaRepository;
 
 public interface ClienteRepository extends JpaRepository<Cliente, Long> {
     Optional<Cliente> findFirstByNombreIgnoreCase(String nombre);
+
+    boolean existsByCorreoIgnoreCase(String correo);
+
+    boolean existsByTelefono(String telefono);
 }
