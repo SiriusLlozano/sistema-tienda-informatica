@@ -5,6 +5,8 @@ import com.example.tienda_computadoras.model.Cliente;
 import com.example.tienda_computadoras.model.DetalleVenta;
 import com.example.tienda_computadoras.model.Producto;
 import com.example.tienda_computadoras.model.Venta;
+import com.example.tienda_computadoras.dto.request.ActualizarClienteDTO;
+import com.example.tienda_computadoras.dto.request.ActualizarProductoDTO;
 import com.example.tienda_computadoras.dto.request.CrearClienteDTO;
 import com.example.tienda_computadoras.dto.response.ClienteDTO;
 import com.example.tienda_computadoras.repository.ClienteRepository;
@@ -182,6 +184,81 @@ class TiendaComputadorasApplicationTests {
 
 		Assertions.assertEquals(1, ventaService.listarVentasPorProducto(producto.getId()).size());
 		Assertions.assertEquals(1, ventaService.listarVentasPorCliente(cliente.getId()).size());
+	}
+
+	@Test
+	void updatesAndDeletesClientWithoutRelatedRecords() {
+		ClienteDTO cliente = clienteService.registrarCliente(
+				new CrearClienteDTO("Pedro", "pedro@example.com", "999123456"));
+
+		ClienteDTO actualizado = clienteService.actualizarCliente(
+				cliente.id(),
+				new ActualizarClienteDTO("Pedro Actualizado", "pedro@example.com", "999123456"));
+
+		Assertions.assertEquals("Pedro Actualizado", actualizado.nombre());
+		clienteService.eliminarCliente(cliente.id());
+		Assertions.assertTrue(clienteRepository.findById(cliente.id()).isEmpty());
+	}
+
+	@Test
+	void preventsDeletingClientWithSales() {
+		Cliente cliente = new Cliente();
+		cliente.setNombre("Pedro");
+		clienteRepository.saveAndFlush(cliente);
+
+		Venta venta = new Venta();
+		venta.setCliente(cliente);
+		venta.setFecha(LocalDate.now());
+		ventaRepository.saveAndFlush(venta);
+
+		ResponseStatusException exception = Assertions.assertThrows(
+				ResponseStatusException.class,
+				() -> clienteService.eliminarCliente(cliente.getId()));
+
+		Assertions.assertEquals(409, exception.getStatusCode().value());
+	}
+
+	@Test
+	void updatesAndDeletesProductWithoutRelatedRecords() {
+		Categoria categoria = new Categoria("Computadoras", null);
+		entityManager.persist(categoria);
+		Producto producto = new Producto("Laptop", categoria, "Modelo X");
+		producto.setPrecio(new BigDecimal("1200.00"));
+		producto = productoRepository.saveAndFlush(producto);
+
+		var actualizado = productoService.actualizarProducto(
+				producto.getId(),
+				new ActualizarProductoDTO("Laptop Pro", "Portatiles", "Modelo Y",
+						new BigDecimal("1500.00")));
+
+		Assertions.assertEquals("Laptop Pro", actualizado.nombre());
+		Assertions.assertEquals(new BigDecimal("1500.00"), actualizado.precio());
+		productoService.eliminarProducto(producto.getId());
+		Assertions.assertTrue(productoRepository.findById(producto.getId()).isEmpty());
+	}
+
+	@Test
+	void preventsDeletingProductUsedInSaleHistory() {
+		Categoria categoria = new Categoria("Computadoras", null);
+		entityManager.persist(categoria);
+		Producto producto = new Producto("Laptop", categoria, "Modelo X");
+		productoRepository.saveAndFlush(producto);
+
+		DetalleVenta detalle = new DetalleVenta();
+		detalle.setProducto(producto);
+		detalle.setCantidad(1);
+		detalle.setPrecioUnitario(new BigDecimal("1200.00"));
+
+		Venta venta = new Venta();
+		venta.setFecha(LocalDate.now());
+		venta.agregarDetalle(detalle);
+		ventaRepository.saveAndFlush(venta);
+
+		ResponseStatusException exception = Assertions.assertThrows(
+				ResponseStatusException.class,
+				() -> productoService.eliminarProducto(producto.getId()));
+
+		Assertions.assertEquals(409, exception.getStatusCode().value());
 	}
 
 	@Test

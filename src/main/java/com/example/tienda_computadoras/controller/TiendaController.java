@@ -1,11 +1,14 @@
 package com.example.tienda_computadoras.controller;
 
 import com.example.tienda_computadoras.dto.request.CrearProductoDTO;
+import com.example.tienda_computadoras.dto.request.ActualizarClienteDTO;
+import com.example.tienda_computadoras.dto.request.ActualizarProductoDTO;
 import com.example.tienda_computadoras.dto.request.CrearPedidoDTO;
 import com.example.tienda_computadoras.dto.request.RegistrarVentaDTO;
 import com.example.tienda_computadoras.dto.request.CrearClienteDTO;
 import com.example.tienda_computadoras.dto.response.ClienteDTO;
 import com.example.tienda_computadoras.dto.response.ProductoDTO;
+import com.example.tienda_computadoras.dto.response.ProductoDetalleDTO;
 import com.example.tienda_computadoras.dto.response.VentaDTO;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
@@ -20,7 +23,6 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.math.BigDecimal;
 
 @RestController
 public class TiendaController {
@@ -47,16 +49,41 @@ public class TiendaController {
         return respuesta;
     }
 
-    // 2. GET para ver los productos disponibles en la tienda (datos fijos)
-    // URL de prueba: http://localhost:8080/productos
+    // GET /productos devuelve el catalogo persistido en la base de datos.
     @GetMapping("/productos")
     @PreAuthorize("hasAnyRole('ADMIN', 'VENDEDOR')")
-    public Map<String, String> listarProductos() {
-        Map<String, String> respuesta = new HashMap<>();
-        respuesta.put("producto_1", "Laptop Gamer");
-        respuesta.put("producto_2", "Monitor LED 24 pulgadas");
-        respuesta.put("producto_3", "Teclado y Mouse Inalámbricos");
-        return respuesta;
+    public List<ProductoDetalleDTO> listarProductos() {
+        return productoService.listarProductosDetalle();
+    }
+
+    @GetMapping("/productos/{productoId}")
+    @PreAuthorize("hasAnyRole('ADMIN', 'VENDEDOR')")
+    public ProductoDetalleDTO buscarProductoPorId(@PathVariable Long productoId) {
+        return productoService.buscarProducto(productoId);
+    }
+
+    @PostMapping("/productos")
+    @PreAuthorize("hasRole('ADMIN')")
+    @ResponseStatus(HttpStatus.CREATED)
+    public ProductoDetalleDTO crearProducto(@RequestBody CrearProductoDTO dto) {
+        Producto producto = productoService.registrarProducto(
+                dto.nombre(), dto.categoria(), dto.modelo(), dto.precio());
+        return productoService.buscarProducto(producto.getId());
+    }
+
+    @PutMapping("/productos/{productoId}")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ProductoDetalleDTO actualizarProducto(
+            @PathVariable Long productoId,
+            @RequestBody ActualizarProductoDTO dto) {
+        return productoService.actualizarProducto(productoId, dto);
+    }
+
+    @DeleteMapping("/productos/{productoId}")
+    @PreAuthorize("hasRole('ADMIN')")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    public void eliminarProducto(@PathVariable Long productoId) {
+        productoService.eliminarProducto(productoId);
     }
 
     // 3. GET para buscar un producto por su nombre (lógica 1)
@@ -101,6 +128,33 @@ public class TiendaController {
     @ResponseStatus(HttpStatus.CREATED)
     public ClienteDTO registrarCliente(@RequestBody CrearClienteDTO dto) {
         return clienteService.registrarCliente(dto);
+    }
+
+    @GetMapping("/clientes")
+    @PreAuthorize("hasAnyRole('ADMIN', 'VENDEDOR')")
+    public List<ClienteDTO> obtenerClientes() {
+        return clienteService.listarClientes();
+    }
+
+    @GetMapping("/clientes/{clienteId}")
+    @PreAuthorize("hasAnyRole('ADMIN', 'VENDEDOR')")
+    public ClienteDTO buscarClientePorId(@PathVariable Long clienteId) {
+        return clienteService.buscarCliente(clienteId);
+    }
+
+    @PutMapping("/clientes/{clienteId}")
+    @PreAuthorize("hasAnyRole('ADMIN', 'VENDEDOR')")
+    public ClienteDTO actualizarCliente(
+            @PathVariable Long clienteId,
+            @RequestBody ActualizarClienteDTO dto) {
+        return clienteService.actualizarCliente(clienteId, dto);
+    }
+
+    @DeleteMapping("/clientes/{clienteId}")
+    @PreAuthorize("hasRole('ADMIN')")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    public void eliminarCliente(@PathVariable Long clienteId) {
+        clienteService.eliminarCliente(clienteId);
     }
 
     // GET http://localhost:8080/clientes

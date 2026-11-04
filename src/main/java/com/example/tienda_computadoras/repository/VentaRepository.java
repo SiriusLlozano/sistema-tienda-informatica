@@ -9,4 +9,6 @@ public interface VentaRepository extends JpaRepository<Venta, Long> {
     List<Venta> findDistinctByDetalles_Producto_IdOrderByFechaDesc(Long productoId);
 
     List<Venta> findByCliente_IdOrderByFechaDesc(Long clienteId);
+
+    boolean existsByCliente_Id(Long clienteId);
 }

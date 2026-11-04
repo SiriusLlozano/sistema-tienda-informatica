@@ -1,11 +1,19 @@
 package com.example.tienda_computadoras.services;
 
+import com.example.tienda_computadoras.dto.request.ActualizarProductoDTO;
+import com.example.tienda_computadoras.dto.response.ProductoDetalleDTO;
 import com.example.tienda_computadoras.model.Producto;
 import com.example.tienda_computadoras.model.Categoria;
+import com.example.tienda_computadoras.repository.DetalleCompraRepository;
+import com.example.tienda_computadoras.repository.DetalleVentaRepository;
+import com.example.tienda_computadoras.repository.InventarioRepository;
 import com.example.tienda_computadoras.repository.ProductoRepository;
 import com.example.tienda_computadoras.repository.CategoriaRepository;
+import com.example.tienda_computadoras.repository.ProductoProveedorRepository;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
+import org.springframework.web.server.ResponseStatusException;
 
 import java.math.BigDecimal;
 import java.util.List;
@@ -19,18 +27,25 @@ public class ProductoService {
     @Autowired
     private CategoriaRepository categoriaRepository;
 
+    @Autowired
+    private DetalleVentaRepository detalleVentaRepository;
+
+    @Autowired
+    private DetalleCompraRepository detalleCompraRepository;
+
+    @Autowired
+    private InventarioRepository inventarioRepository;
+
+    @Autowired
+    private ProductoProveedorRepository productoProveedorRepository;
+
     public Producto registrarProducto(
             String nombre,
             String nombreCategoria,
             String modelo,
             BigDecimal precio) {
 
-        Categoria categoria = categoriaRepository
-                .findFirstByNombreCategoriaIgnoreCase(nombreCategoria)
-                .orElseGet(() -> categoriaRepository.save(
-                        new Categoria(nombreCategoria, null)
-                ));
-        Producto producto = new Producto(nombre, categoria, modelo);
+        Producto producto = new Producto(nombre, obtenerOCrearCategoria(nombreCategoria), modelo);
         producto.setPrecio(precio == null ? BigDecimal.ZERO : precio);
 
         return productoRepository.save(producto);
@@ -39,6 +54,59 @@ public class ProductoService {
     // Devuelve todos los productos guardados
     public List<Producto> listarProductos() {
         return productoRepository.findAll();
+    }
+
+    public List<ProductoDetalleDTO> listarProductosDetalle() {
+        return productoRepository.findAll().stream()
+                .map(this::convertirADetalleDto)
+                .toList();
+    }
+
+    public ProductoDetalleDTO buscarProducto(Long productoId) {
+        return convertirADetalleDto(obtenerProducto(productoId));
+    }
+
+    public ProductoDetalleDTO actualizarProducto(Long productoId, ActualizarProductoDTO dto) {
+        Producto producto = obtenerProducto(productoId);
+        producto.setNombre(dto.nombre());
+        producto.setCategoria(obtenerOCrearCategoria(dto.categoria()));
+        producto.setModelo(dto.modelo());
+        producto.setPrecio(dto.precio() == null ? BigDecimal.ZERO : dto.precio());
+        return convertirADetalleDto(productoRepository.save(producto));
+    }
+
+    public void eliminarProducto(Long productoId) {
+        Producto producto = obtenerProducto(productoId);
+        if (detalleVentaRepository.existsByProducto_Id(productoId)
+                || detalleCompraRepository.existsByProducto_Id(productoId)
+                || inventarioRepository.existsByProducto_Id(productoId)
+                || productoProveedorRepository.existsByProducto_Id(productoId)) {
+            throw new ResponseStatusException(
+                    HttpStatus.CONFLICT,
+                    "No se puede eliminar el producto porque tiene ventas, compras, inventario o proveedores asociados");
+        }
+        productoRepository.delete(producto);
+    }
+
+    private Producto obtenerProducto(Long productoId) {
+        return productoRepository.findById(productoId)
+                .orElseThrow(() -> new ResponseStatusException(
+                        HttpStatus.NOT_FOUND, "No existe un producto con el id " + productoId));
+    }
+
+    private Categoria obtenerOCrearCategoria(String nombreCategoria) {
+        return categoriaRepository.findFirstByNombreCategoriaIgnoreCase(nombreCategoria)
+                .orElseGet(() -> categoriaRepository.save(new Categoria(nombreCategoria, null)));
+    }
+
+    private ProductoDetalleDTO convertirADetalleDto(Producto producto) {
+        return new ProductoDetalleDTO(
+                producto.getId(),
+                producto.getNombre(),
+                producto.getCategoria() == null ? null : producto.getCategoria().getNombreCategoria(),
+                producto.getModelo(),
+                producto.getPrecio()
+        );
     }
 
     // Lógica 1 (buscar): verifica si un producto está en la tienda
